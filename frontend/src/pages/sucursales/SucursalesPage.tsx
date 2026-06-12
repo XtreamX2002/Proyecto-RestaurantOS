@@ -60,6 +60,30 @@ const formatDiasOperacionTexto = (value?: string) => {
   return labels.join(', ');
 };
 
+const normalizarNombreSucursal = (value: string) => {
+  return value
+    .toUpperCase()
+    .replace(/[^A-ZÁÉÍÓÚÜÑ0-9\s.\-/'&]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .slice(0, 80);
+};
+
+const normalizarDireccionSucursal = (value: string) => {
+  return value
+    .toUpperCase()
+    .replace(/[^A-ZÁÉÍÓÚÜÑ0-9\s.,\-/#]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .slice(0, 120);
+};
+
+const normalizarTextoFinal = (value: string) => {
+  return value.trim().replace(/\s+/g, ' ');
+};
+
+const telefonoValido = (telefono: string) => {
+  return /^\d{7}$/.test(telefono) || /^9\d{8}$/.test(telefono);
+};
+
 const emptyForm: FormState = {
   nombre: '',
   direccion: '',
@@ -114,9 +138,9 @@ export default function SucursalesPage() {
 
   const crear = useMutation({
     mutationFn: () => sucursalesService.create({
-      nombre: form.nombre.trim(),
-      direccion: form.direccion.trim() || undefined,
-      telefono: form.telefono.trim() || undefined,
+      nombre: normalizarTextoFinal(form.nombre),
+      direccion: normalizarTextoFinal(form.direccion),
+      telefono: form.telefono.trim(),
       horarioApertura: form.horarioApertura,
       horarioCierre: form.horarioCierre,
       diasOperacion: formatDiasOperacion(form.diasOperacion),
@@ -131,9 +155,9 @@ export default function SucursalesPage() {
 
   const actualizar = useMutation({
     mutationFn: () => sucursalesService.update(editing!.id, {
-      nombre: form.nombre.trim(),
-      direccion: form.direccion.trim() || undefined,
-      telefono: form.telefono.trim() || undefined,
+      nombre: normalizarTextoFinal(form.nombre),
+      direccion: normalizarTextoFinal(form.direccion),
+      telefono: form.telefono.trim(),
       horarioApertura: form.horarioApertura,
       horarioCierre: form.horarioCierre,
       diasOperacion: formatDiasOperacion(form.diasOperacion),
@@ -190,8 +214,8 @@ export default function SucursalesPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const nombre = form.nombre.trim();
-    const direccion = form.direccion.trim();
+    const nombre = normalizarTextoFinal(form.nombre);
+    const direccion = normalizarTextoFinal(form.direccion);
     const telefono = form.telefono.trim();
 
     if (nombre.length < 3) {
@@ -199,8 +223,18 @@ export default function SucursalesPage() {
       return;
     }
 
+    if (nombre.length > 80) {
+      toast.error('El nombre de la sucursal no debe superar 80 caracteres');
+      return;
+    }
+
     if (direccion.length < 5) {
       toast.error('La dirección es obligatoria y debe tener al menos 5 caracteres');
+      return;
+    }
+
+    if (direccion.length > 120) {
+      toast.error('La dirección no debe superar 120 caracteres');
       return;
     }
 
@@ -214,8 +248,8 @@ export default function SucursalesPage() {
       return;
     }
 
-    if (telefono.length < 7 || telefono.length > 9) {
-      toast.error('El teléfono debe tener entre 7 y 9 dígitos');
+    if (!telefonoValido(telefono)) {
+      toast.error('El teléfono debe tener 7 dígitos o 9 dígitos empezando en 9');
       return;
     }
 
@@ -460,9 +494,11 @@ export default function SucursalesPage() {
                   <input
                     id="sucursal-nombre"
                     value={form.nombre}
-                    onChange={(e) => handleChange('nombre', e.target.value)}
-                    placeholder="Ej: Local Centro"
+                    onChange={(e) => handleChange('nombre', normalizarNombreSucursal(e.target.value))}
+                    placeholder="Ej: LOCAL CENTRO"
                     required
+                    minLength={3}
+                    maxLength={80}
                     className="w-full border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
@@ -472,9 +508,11 @@ export default function SucursalesPage() {
                   <input
                     id="sucursal-direccion"
                     value={form.direccion}
-                    onChange={(e) => handleChange('direccion', e.target.value)}
-                    placeholder="Av. Principal 123"
+                    onChange={(e) => handleChange('direccion', normalizarDireccionSucursal(e.target.value))}
+                    placeholder="AV. PRINCIPAL 123"
                     required
+                    minLength={5}
+                    maxLength={120}
                     className="w-full border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
@@ -495,7 +533,7 @@ export default function SucursalesPage() {
                     className="w-full border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                   <p className="text-xs text-text-muted mt-1">
-                    Solo números. Entre 7 y 9 dígitos.
+                    Solo números. Usa 7 dígitos para fijo o 9 dígitos empezando en 9 para celular.
                   </p>
                 </div>
 

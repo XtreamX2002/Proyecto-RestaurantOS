@@ -6,7 +6,14 @@ export const usuariosService = {
     const { data } = await api.get('/usuarios', { params: { sucursalId } });
     return data;
   },
-  create: async (payload: { nombre: string; email: string; password: string; rol: string; sucursalId?: string }): Promise<Usuario> => {
+  create: async (payload: {
+    nombre: string;
+    email: string;
+    password: string;
+    rol: string;
+    sucursalId?: string;
+    activo?: boolean;
+  }): Promise<Usuario> => {
     const { data } = await api.post('/usuarios', payload);
     return data;
   },

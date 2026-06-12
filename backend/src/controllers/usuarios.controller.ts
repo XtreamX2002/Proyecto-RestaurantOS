@@ -42,7 +42,7 @@ export async function getUsuarios(req: Request, res: Response): Promise<void> {
 
 // POST /usuarios — crear usuario en una sucursal
 export async function createUsuario(req: Request, res: Response): Promise<void> {
-  const { nombre, email, password, rol, sucursalId } = req.body;
+  const { nombre, email, password, rol, sucursalId, activo } = req.body;
   if (!nombre || !email || !password || !rol) {
     res.status(400).json({ error: 'Todos los campos son requeridos' }); return;
   }
@@ -59,12 +59,54 @@ export async function createUsuario(req: Request, res: Response): Promise<void> 
   const targetSucursalId = req.user!.rol === 'DUENO' ? sucursalId : req.user!.sucursalId!;
   if (!targetSucursalId) { res.status(400).json({ error: 'sucursalId requerido' }); return; }
 
-  const existe = await prisma.usuario.findUnique({ where: { email } });
+  const nombreNormalizado = nombre.trim().replace(/\s+/g, ' ');
+  const emailNormalizado = email.trim().toLowerCase();
+
+  if (nombreNormalizado.length < 3) {
+    res.status(400).json({ error: 'El nombre debe tener al menos 3 caracteres' });
+    return;
+  }
+
+  if (nombreNormalizado.length > 80) {
+    res.status(400).json({ error: 'El nombre no debe superar 80 caracteres' });
+    return;
+  }
+
+  const nombreValido = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s]+$/.test(nombreNormalizado);
+  if (!nombreValido) {
+    res.status(400).json({ error: 'El nombre solo debe contener letras y espacios' });
+    return;
+  }
+
+  if (emailNormalizado.length > 254) {
+    res.status(400).json({ error: 'El email no debe superar 254 caracteres' });
+    return;
+  }
+
+  const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado);
+  if (!emailValido) {
+    res.status(400).json({ error: 'Formato de email inválido' });
+    return;
+  }
+
+  if (typeof activo !== 'undefined' && typeof activo !== 'boolean') {
+    res.status(400).json({ error: 'El estado del usuario es inválido' });
+    return;
+  }
+
+  const existe = await prisma.usuario.findUnique({ where: { email: emailNormalizado } });
   if (existe) { res.status(409).json({ error: 'Email ya registrado' }); return; }
 
   const hash = await bcrypt.hash(password, 10);
   const usuario = await prisma.usuario.create({
-    data: { nombre, email, passwordHash: hash, rol, sucursalId: targetSucursalId },
+    data: {
+      nombre: nombreNormalizado,
+      email: emailNormalizado,
+      passwordHash: hash,
+      rol,
+      sucursalId: targetSucursalId,
+      activo: typeof activo === 'boolean' ? activo : true,
+    },
     select: { id: true, nombre: true, email: true, rol: true, activo: true, creadoEn: true, sucursalId: true, sucursal: { select: { id: true, nombre: true } } },
   });
   res.status(201).json(usuario);
@@ -82,9 +124,41 @@ export async function updateUsuario(req: Request, res: Response): Promise<void> 
   const emailNormalizado =
     typeof email === 'string' ? email.trim().toLowerCase() : undefined;
 
+  const nombreNormalizado =
+    typeof nombre === 'string' ? nombre.trim().replace(/\s+/g, ' ') : undefined;
+
+  if (nombre !== undefined) {
+    if (!nombreNormalizado) {
+      res.status(400).json({ error: 'El nombre no puede estar vacío' });
+      return;
+    }
+
+    if (nombreNormalizado.length < 3) {
+      res.status(400).json({ error: 'El nombre debe tener al menos 3 caracteres' });
+      return;
+    }
+
+    if (nombreNormalizado.length > 80) {
+      res.status(400).json({ error: 'El nombre no debe superar 80 caracteres' });
+      return;
+    }
+
+    const nombreValido = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s]+$/.test(nombreNormalizado);
+    if (!nombreValido) {
+      res.status(400).json({ error: 'El nombre solo debe contener letras y espacios' });
+      return;
+    }
+  }
+  
+
   if (email !== undefined) {
     if (!emailNormalizado) {
       res.status(400).json({ error: 'El email no puede estar vacío' });
+      return;
+    }
+
+    if (emailNormalizado.length > 254) {
+      res.status(400).json({ error: 'El email no debe superar 254 caracteres' });
       return;
     }
 
@@ -135,7 +209,7 @@ export async function updateUsuario(req: Request, res: Response): Promise<void> 
   const usuario = await prisma.usuario.update({
     where: { id: req.params.id },
     data: {
-      ...(nombre !== undefined ? { nombre } : {}),
+      ...(nombreNormalizado !== undefined ? { nombre: nombreNormalizado } : {}),
       ...(emailNormalizado !== undefined ? { email: emailNormalizado } : {}),
       ...(rol !== undefined ? { rol } : {}),
       ...(activo !== undefined ? { activo } : {}),

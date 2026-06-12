@@ -3,6 +3,32 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+const normalizarNombreSucursal = (value: string) => {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ');
+};
+
+const normalizarDireccionSucursal = (value: string) => {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ');
+};
+
+const nombreSucursalValido = (value: string) => {
+  return /^[A-ZÁÉÍÓÚÜÑ0-9\s.\-/'&]+$/.test(value);
+};
+
+const direccionSucursalValida = (value: string) => {
+  return /^[A-ZÁÉÍÓÚÜÑ0-9\s.,\-/#]+$/.test(value);
+};
+
+const telefonoValido = (telefono: string) => {
+  return /^\d{7}$/.test(telefono) || /^9\d{8}$/.test(telefono);
+};
+
 export async function getSucursales(req: Request, res: Response): Promise<void> {
   const { userId, rol, sucursalId } = req.user!;
 
@@ -33,13 +59,71 @@ export async function getSucursalById(req: Request, res: Response): Promise<void
 
 export async function createSucursal(req: Request, res: Response): Promise<void> {
   const { nombre, direccion, telefono, horarioApertura, horarioCierre, diasOperacion } = req.body;
-  if (!nombre) { res.status(400).json({ error: 'El nombre es requerido' }); return; }
+
+  if (!nombre || !direccion || !telefono) {
+    res.status(400).json({ error: 'Nombre, dirección y teléfono son requeridos' });
+    return;
+  }
+
+  const nombreNormalizado = normalizarNombreSucursal(String(nombre));
+  const direccionNormalizada = normalizarDireccionSucursal(String(direccion));
+  const telefonoNormalizado = String(telefono).trim().replace(/\D/g, '');
+
+  if (nombreNormalizado.length < 3) {
+    res.status(400).json({ error: 'El nombre de la sucursal debe tener al menos 3 caracteres' });
+    return;
+  }
+
+  if (nombreNormalizado.length > 80) {
+    res.status(400).json({ error: 'El nombre de la sucursal no debe superar 80 caracteres' });
+    return;
+  }
+
+  if (!nombreSucursalValido(nombreNormalizado)) {
+    res.status(400).json({ error: 'El nombre de la sucursal contiene caracteres no permitidos' });
+    return;
+  }
+
+  if (direccionNormalizada.length < 5) {
+    res.status(400).json({ error: 'La dirección debe tener al menos 5 caracteres' });
+    return;
+  }
+
+  if (direccionNormalizada.length > 120) {
+    res.status(400).json({ error: 'La dirección no debe superar 120 caracteres' });
+    return;
+  }
+
+  if (!direccionSucursalValida(direccionNormalizada)) {
+    res.status(400).json({ error: 'La dirección contiene caracteres no permitidos' });
+    return;
+  }
+
+  if (!telefonoValido(telefonoNormalizado)) {
+    res.status(400).json({ error: 'El teléfono debe tener 7 dígitos o 9 dígitos empezando en 9' });
+    return;
+  }
+
+  if (!diasOperacion) {
+    res.status(400).json({ error: 'Los días de operación son requeridos' });
+    return;
+  }
+
+  if (!horarioApertura || !horarioCierre) {
+    res.status(400).json({ error: 'El horario de apertura y cierre es requerido' });
+    return;
+  }
+
+  if (horarioApertura >= horarioCierre) {
+    res.status(400).json({ error: 'La hora de cierre debe ser posterior a la apertura' });
+    return;
+  }
 
   const sucursal = await prisma.sucursal.create({
     data: {
-      nombre,
-      direccion,
-      telefono,
+      nombre: nombreNormalizado,
+      direccion: direccionNormalizada,
+      telefono: telefonoNormalizado,
       horarioApertura,
       horarioCierre,
       diasOperacion,
@@ -47,15 +131,102 @@ export async function createSucursal(req: Request, res: Response): Promise<void>
       duenoId: req.user!.userId,
     },
   });
+
   res.status(201).json(sucursal);
 }
 
 export async function updateSucursal(req: Request, res: Response): Promise<void> {
   const { nombre, direccion, telefono, horarioApertura, horarioCierre, diasOperacion } = req.body;
+
+  const existe = await prisma.sucursal.findUnique({
+    where: { id: req.params.id },
+    select: { id: true },
+  });
+
+  if (!existe) {
+    res.status(404).json({ error: 'Sucursal no encontrada' });
+    return;
+  }
+
+  const data: {
+    nombre?: string;
+    direccion?: string;
+    telefono?: string;
+    horarioApertura?: string;
+    horarioCierre?: string;
+    diasOperacion?: string;
+  } = {};
+
+  if (nombre !== undefined) {
+    const nombreNormalizado = normalizarNombreSucursal(String(nombre));
+
+    if (nombreNormalizado.length < 3) {
+      res.status(400).json({ error: 'El nombre de la sucursal debe tener al menos 3 caracteres' });
+      return;
+    }
+
+    if (nombreNormalizado.length > 80) {
+      res.status(400).json({ error: 'El nombre de la sucursal no debe superar 80 caracteres' });
+      return;
+    }
+
+    if (!nombreSucursalValido(nombreNormalizado)) {
+      res.status(400).json({ error: 'El nombre de la sucursal contiene caracteres no permitidos' });
+      return;
+    }
+
+    data.nombre = nombreNormalizado;
+  }
+
+  if (direccion !== undefined) {
+    const direccionNormalizada = normalizarDireccionSucursal(String(direccion));
+
+    if (direccionNormalizada.length < 5) {
+      res.status(400).json({ error: 'La dirección debe tener al menos 5 caracteres' });
+      return;
+    }
+
+    if (direccionNormalizada.length > 120) {
+      res.status(400).json({ error: 'La dirección no debe superar 120 caracteres' });
+      return;
+    }
+
+    if (!direccionSucursalValida(direccionNormalizada)) {
+      res.status(400).json({ error: 'La dirección contiene caracteres no permitidos' });
+      return;
+    }
+
+    data.direccion = direccionNormalizada;
+  }
+
+  if (telefono !== undefined) {
+    const telefonoNormalizado = String(telefono).trim().replace(/\D/g, '');
+
+    if (!telefonoValido(telefonoNormalizado)) {
+      res.status(400).json({ error: 'El teléfono debe tener 7 dígitos o 9 dígitos empezando en 9' });
+      return;
+    }
+
+    data.telefono = telefonoNormalizado;
+  }
+
+  if (horarioApertura !== undefined) data.horarioApertura = horarioApertura;
+  if (horarioCierre !== undefined) data.horarioCierre = horarioCierre;
+  if (diasOperacion !== undefined) data.diasOperacion = diasOperacion;
+
+  const aperturaFinal = data.horarioApertura ?? undefined;
+  const cierreFinal = data.horarioCierre ?? undefined;
+
+  if (aperturaFinal && cierreFinal && aperturaFinal >= cierreFinal) {
+    res.status(400).json({ error: 'La hora de cierre debe ser posterior a la apertura' });
+    return;
+  }
+
   const sucursal = await prisma.sucursal.update({
     where: { id: req.params.id },
-    data: { nombre, direccion, telefono, horarioApertura, horarioCierre, diasOperacion },
+    data,
   });
+
   res.json(sucursal);
 }
 

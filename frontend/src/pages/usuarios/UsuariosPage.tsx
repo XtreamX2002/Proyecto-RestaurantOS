@@ -135,8 +135,12 @@ export default function UsuariosPage() {
   const crear = useMutation({
     mutationFn: () =>
       usuariosService.create({
-        ...form,
+        nombre: form.nombre.trim().replace(/\s+/g, ' '),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
         rol: canAssignAdminRole ? form.rol : 'MESERO',
+        sucursalId: form.sucursalId || undefined,
+        activo: form.activo,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['usuarios', user?.sucursalId ?? 'all'] });
@@ -148,7 +152,7 @@ export default function UsuariosPage() {
 
   const actualizar = useMutation({
     mutationFn: () => usuariosService.update(editing!.id, {
-      nombre: form.nombre.trim(),
+      nombre: form.nombre.trim().replace(/\s+/g, ' '),
       email: form.email.trim().toLowerCase(),
       ...(isDueno
         ? { rol: form.rol }
@@ -229,11 +233,28 @@ export default function UsuariosPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const nombre = form.nombre.trim().replace(/\s+/g, ' ');
     const email = form.email.trim().toLowerCase();
     const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    const nombreValido = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s]+$/.test(nombre);
 
-    if (!form.nombre.trim()) {
-      toast.error('El nombre no puede estar vacío');
+    if (nombre.length < 3) {
+      toast.error('El nombre debe tener al menos 3 caracteres');
+      return;
+    }
+
+    if (nombre.length > 80) {
+      toast.error('El nombre no debe superar 80 caracteres');
+      return;
+    }
+
+    if (!nombreValido) {
+      toast.error('El nombre solo debe contener letras y espacios');
+      return;
+    }
+
+    if (email.length > 254) {
+      toast.error('El email no debe superar 254 caracteres');
       return;
     }
 
@@ -249,12 +270,13 @@ export default function UsuariosPage() {
 
     setForm((prev) => ({
       ...prev,
-      nombre: prev.nombre.trim(),
+      nombre,
       email,
     }));
 
     editing ? actualizar.mutate() : crear.mutate();
   };
+
   const isReadOnly = Boolean(editing && !isModalEditing);
 
   return (
@@ -485,9 +507,18 @@ export default function UsuariosPage() {
                   <input
                     id="usuario-nombre"
                     value={form.nombre}
-                    onChange={e => handleChange('nombre', e.target.value)}
+                    onChange={(e) => {
+                      const soloLetras = e.target.value
+                        .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s]/g, '')
+                        .replace(/\s{2,}/g, ' ')
+                        .slice(0, 80);
+
+                      handleChange('nombre', soloLetras);
+                    }}
                     placeholder="Juan Pérez"
                     required
+                    minLength={3}
+                    maxLength={80}
                     disabled={isReadOnly}
                     className={`w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary ${isReadOnly ? 'bg-gray-100 text-text-muted cursor-not-allowed' : 'bg-white text-text'
                       }`}
@@ -500,9 +531,11 @@ export default function UsuariosPage() {
                     id="usuario-email"
                     type="email"
                     value={form.email}
-                    onChange={e => handleChange('email', e.target.value)}
+                    onChange={e => handleChange('email', e.target.value.toLowerCase())}
                     placeholder="usuario@ejemplo.com"
                     required
+                    minLength={6}
+                    maxLength={254}
                     disabled={isReadOnly}
                     className={`w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
                       isReadOnly ? 'bg-gray-100 text-text-muted cursor-not-allowed' : 'bg-white text-text'
