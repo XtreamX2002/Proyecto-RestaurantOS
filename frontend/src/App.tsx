@@ -36,6 +36,7 @@ import MesasPage from './pages/administrador/Mesas/MesasPage';
 import PedidosPage from './pages/administrador/pedidos/PedidosPage';
 
 import { useAuthStore } from './store/authStore';
+import { useVistaAdministradorStore } from './store/vistaAdministradorStore';
 import type { AuthUser } from './types';
 
 const qc = new QueryClient({
@@ -71,6 +72,32 @@ function RequireRole({
 }) {
   if (!user || !roles.includes(user.rol)) {
     return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function RequireAdminOrDuenoVistaAdministrador({
+  user,
+  children,
+}: {
+  user: AuthUser | null;
+  children: React.ReactNode;
+}) {
+  const {
+    activo: vistaAdministradorActiva,
+    sucursalActivaId,
+  } = useVistaAdministradorStore();
+
+  const isAdmin = user?.rol === 'ADMIN';
+
+  const isDuenoEnVistaAdministrador =
+    user?.rol === 'DUENO' &&
+    vistaAdministradorActiva &&
+    Boolean(sucursalActivaId);
+
+  if (!user || (!isAdmin && !isDuenoEnVistaAdministrador)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -293,12 +320,9 @@ function AppRoutes() {
           <Route
             path="/mesas"
             element={
-              <RequireRole
-                user={user}
-                roles={['ADMIN']}
-              >
+              <RequireAdminOrDuenoVistaAdministrador user={user}>
                 <MesasPage />
-              </RequireRole>
+              </RequireAdminOrDuenoVistaAdministrador>
             }
           />
 

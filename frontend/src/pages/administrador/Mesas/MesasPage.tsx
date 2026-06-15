@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Plus, Pencil, Users, X, Loader2 } from 'lucide-react';
 import { api } from '../../../services/api';
+import { useAuthStore } from '../../../store/authStore';
+import { useVistaAdministradorStore } from '../../../store/vistaAdministradorStore';
 
 interface Mesa {
   id: string;
@@ -10,6 +12,24 @@ interface Mesa {
   sucursalId: string;
 }
 export default function MesasPage() {
+  const { user } = useAuthStore();
+
+  const {
+    activo: vistaAdministradorActiva,
+    sucursalActivaId,
+    sucursalActivaNombre,
+  } = useVistaAdministradorStore();
+
+  const isDuenoEnVistaAdministrador =
+    user?.rol === 'DUENO' &&
+    vistaAdministradorActiva &&
+    Boolean(sucursalActivaId);
+
+  const sucursalIdOperativa =
+    isDuenoEnVistaAdministrador
+      ? sucursalActivaId
+      : user?.sucursalId;
+
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,14 +44,22 @@ export default function MesasPage() {
 
   useEffect(() => {
     cargarMesas();
-  }, []);
+  }, [sucursalIdOperativa]);
 
   const cargarMesas = async () => {
     try {
       setLoading(true);
 
+      const params = new URLSearchParams();
+
+      if (isDuenoEnVistaAdministrador && sucursalIdOperativa) {
+        params.append('sucursalId', sucursalIdOperativa);
+      }
+
+      const query = params.toString();
+
       const { data } = await api.get<Mesa[]>(
-        '/mesas'
+        query ? `/mesas?${query}` : '/mesas'
       );
 
       setMesas(
@@ -74,6 +102,9 @@ export default function MesasPage() {
           {
             numero,
             capacidad,
+            sucursalId: isDuenoEnVistaAdministrador
+              ? sucursalIdOperativa
+              : undefined,
           }
         );
 
@@ -107,6 +138,9 @@ export default function MesasPage() {
             numero: mesaEditando.numero,
             capacidad: mesaEditando.capacidad,
             estado: mesaEditando.estado,
+            sucursalId: isDuenoEnVistaAdministrador
+              ? sucursalIdOperativa
+              : undefined,
           }
         );
 

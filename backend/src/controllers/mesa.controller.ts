@@ -3,12 +3,51 @@ import { PrismaClient, EstadoMesa } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-export const getMesas = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const sucursalId = req.user?.sucursalId;
+const obtenerSucursalOperativa = async (req: Request) => {
+  const user = req.user as {
+    userId: string;
+    rol: string;
+    sucursalId?: string;
+  };
+
+  if (user.rol === 'ADMIN' || user.rol === 'MESERO') {
+    return user.sucursalId ?? null;
+  }
+
+  if (user.rol === 'DUENO') {
+    const sucursalId =
+      typeof req.query.sucursalId === 'string'
+        ? req.query.sucursalId
+        : typeof req.body.sucursalId === 'string'
+          ? req.body.sucursalId
+          : null;
 
     if (!sucursalId) {
-      res.status(400).json({ message: "Sucursal no encontrada en token" });
+      return null;
+    }
+
+    const sucursal = await prisma.sucursal.findFirst({
+      where: {
+        id: sucursalId,
+        duenoId: user.userId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return sucursal?.id ?? null;
+  }
+
+  return null;
+};
+
+export const getMesas = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const sucursalId = await obtenerSucursalOperativa(req);
+
+    if (!sucursalId) {
+      res.status(400).json({ message: "Sucursal no encontrada o no autorizada" });
       return;
     }
 
@@ -27,16 +66,29 @@ export const getMesas = async (req: Request, res: Response): Promise<void> => {
 export const crearMesa = async (req: Request, res: Response): Promise<void> => {
   try {
     const { numero, capacidad } = req.body;
-    const sucursalId = req.user?.sucursalId;
+    const sucursalId = await obtenerSucursalOperativa(req);
 
     if (!sucursalId) {
-      res.status(400).json({ message: "Sucursal no encontrada en token" });
+      res.status(400).json({ message: "Sucursal no encontrada o no autorizada" });
+      return;
+    }
+
+    const numeroMesa = Number(numero);
+    const capacidadMesa = Number(capacidad);
+
+    if (!numeroMesa || numeroMesa <= 0) {
+      res.status(400).json({ message: "El número de mesa debe ser mayor a 0" });
+      return;
+    }
+
+    if (!capacidadMesa || capacidadMesa <= 0) {
+      res.status(400).json({ message: "La capacidad debe ser mayor a 0" });
       return;
     }
 
     const existe = await prisma.mesa.findFirst({
       where: {
-        numero,
+        numero: numeroMesa,
         sucursalId,
       },
     });
@@ -48,8 +100,8 @@ export const crearMesa = async (req: Request, res: Response): Promise<void> => {
 
     const mesa = await prisma.mesa.create({
       data: {
-        numero,
-        capacidad,
+        numero: numeroMesa,
+        capacidad: capacidadMesa,
         sucursalId,
       },
     });
@@ -64,10 +116,10 @@ export const crearMesa = async (req: Request, res: Response): Promise<void> => {
 export const actualizarMesa = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const sucursalId = req.user?.sucursalId;
+    const sucursalId = await obtenerSucursalOperativa(req);
 
     if (!sucursalId) {
-      res.status(400).json({ message: "Sucursal no encontrada en token" });
+      res.status(400).json({ message: "Sucursal no encontrada o no autorizada" });
       return;
     }
 
@@ -85,13 +137,43 @@ export const actualizarMesa = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const numeroMesa = Number(numero);
+    const capacidadMesa = Number(capacidad);
+
+    if (!numeroMesa || numeroMesa <= 0) {
+      res.status(400).json({ message: "El número de mesa debe ser mayor a 0" });
+      return;
+    }
+
+    if (!capacidadMesa || capacidadMesa <= 0) {
+      res.status(400).json({ message: "La capacidad debe ser mayor a 0" });
+      return;
+    }
+
+    if (numeroMesa !== mesaExiste.numero) {
+      const existeNumero = await prisma.mesa.findFirst({
+        where: {
+          numero: numeroMesa,
+          sucursalId,
+          id: {
+            not: id,
+          },
+        },
+      });
+
+      if (existeNumero) {
+        res.status(400).json({ message: "Ya existe otra mesa con ese número en esta sucursal" });
+        return;
+      }
+    }
+
     const mesa = await prisma.mesa.update({
       where: {
         id,
       },
       data: {
-        numero: Number(numero),
-        capacidad: Number(capacidad),
+        numero: numeroMesa,
+        capacidad: capacidadMesa,
         estado: estado as EstadoMesa,
       },
     });

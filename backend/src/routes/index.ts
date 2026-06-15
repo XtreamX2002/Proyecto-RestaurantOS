@@ -50,9 +50,9 @@ router.get('/reportes', authMiddleware, roleMiddleware('DUENO', 'ADMIN'), getRep
 router.get('/reportes/exportar', authMiddleware, roleMiddleware('DUENO', 'ADMIN'), exportarReporteExcel);
 
 // Mesas
-router.get('/mesas', authMiddleware, roleMiddleware('ADMIN', 'MESERO'), getMesas);
-router.post('/mesas', authMiddleware, roleMiddleware('ADMIN'), crearMesa);
-router.patch('/mesas/:id', authMiddleware, roleMiddleware('ADMIN'), actualizarMesa);
+router.get('/mesas', authMiddleware, roleMiddleware('DUENO', 'ADMIN', 'MESERO'), getMesas);
+router.post('/mesas', authMiddleware, roleMiddleware('DUENO', 'ADMIN'), crearMesa);
+router.patch('/mesas/:id', authMiddleware, roleMiddleware('DUENO', 'ADMIN'), actualizarMesa);
 
 // Menu
 router.post('/categorias', authMiddleware, roleMiddleware('ADMIN', 'DUENO'), crearCategoria);
