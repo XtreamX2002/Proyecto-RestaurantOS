@@ -3,6 +3,7 @@ import { ShoppingBag, TrendingUp, Users } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { formatCurrency } from '../../utils/cn';
 import { dashboardService } from '../../services/dashboard.service';
+import { useVistaAdministradorStore } from '../../store/vistaAdministradorStore';
 import DuenoDashboard from './DuenoDashboard';
 import type { DashboardDueno, DashboardSucursal } from '../../types';
 import {
@@ -55,16 +56,40 @@ export default function DashboardPage() {
   const { user } = useAuthStore();
   const isDueno = user?.rol === 'DUENO';
 
+  const {
+    activo: vistaAdministradorActiva,
+    sucursalActivaId,
+    sucursalActivaNombre,
+  } = useVistaAdministradorStore();
+
+  const isDuenoEnVistaAdministrador =
+    isDueno && vistaAdministradorActiva && Boolean(sucursalActivaId);
+
   const { data, isLoading } = useQuery<DashboardDueno | DashboardSucursal>({
-    queryKey: ['dashboard', user?.rol, user?.sucursalId],
+    queryKey: [
+      'dashboard',
+      user?.rol,
+      user?.sucursalId,
+      isDuenoEnVistaAdministrador ? sucursalActivaId : 'global',
+    ],
     queryFn: async () => {
+      if (isDuenoEnVistaAdministrador && sucursalActivaId) {
+        return dashboardService.getSucursal(sucursalActivaId);
+      }
+
       if (isDueno) {
         return dashboardService.getDueno();
       }
 
       return dashboardService.getSucursal(user?.sucursalId ?? '');
     },
-    enabled: !!user && (isDueno || !!user.sucursalId),
+    enabled:
+      !!user &&
+      (
+        isDuenoEnVistaAdministrador ||
+        isDueno ||
+        !!user.sucursalId
+      ),
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
@@ -84,7 +109,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (isDueno && isDashboardDueno(data)) {
+  if (isDueno && !isDuenoEnVistaAdministrador && isDashboardDueno(data)) {
     return <DuenoDashboard data={data} />;
   }
 
@@ -101,8 +126,12 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-text">Resumen del día</h2>
-        <p className="text-sm text-text-muted">{user?.sucursal?.nombre}</p>
+        <h2 className="text-lg font-semibold text-text">
+          {isDuenoEnVistaAdministrador ? 'Resumen de sucursal' : 'Resumen del día'}
+        </h2>
+        <p className="text-sm text-text-muted">
+          {isDuenoEnVistaAdministrador ? sucursalActivaNombre : user?.sucursal?.nombre}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

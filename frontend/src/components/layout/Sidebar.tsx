@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useVistaAdministradorStore } from '../../store/vistaAdministradorStore';
 import {
   LayoutDashboard,
   Building2,
@@ -56,11 +57,28 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
+  const {
+    activo: vistaAdministradorActiva,
+    sucursalActivaNombre,
+    salirVistaAdministrador,
+  } = useVistaAdministradorStore();
+
+  const isDuenoEnVistaAdministrador =
+    user?.rol === 'DUENO' && vistaAdministradorActiva;
+
+  const navVistaAdministradorDueno = [
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/usuarios', icon: Users, label: 'Personal' },
+    { to: '/reportes', icon: BarChart3, label: 'Reportes' },
+    { to: '/configuracion', icon: Settings, label: 'Configuración' },
+  ];
+  
   const navItems =
-    user?.rol === 'DUENO' ? navDueno :
-      user?.rol === 'ADMIN' ? navAdmin :
-        user?.rol === 'MESERO' ? navMesero :
-          user?.rol === 'COCINERO' ? navCocinero : [];
+    isDuenoEnVistaAdministrador ? navVistaAdministradorDueno :
+      user?.rol === 'DUENO' ? navDueno :
+        user?.rol === 'ADMIN' ? navAdmin :
+          user?.rol === 'MESERO' ? navMesero :
+            user?.rol === 'COCINERO' ? navCocinero : [];
 
   const handleLogout = async () => {
     try {
@@ -99,12 +117,38 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
 
-        {user?.sucursal && (
-          <div className="px-4 py-3 bg-green-50 border-b border-border">
-            <p className="text-xs text-slate-700 font-medium uppercase tracking-wide">Sucursal activa</p>
-            <p className="text-sm font-semibold text-green-800 truncate">{user.sucursal.nombre}</p>
+        {isDuenoEnVistaAdministrador ? (
+          <div className="px-4 py-3 bg-emerald-50 border-b border-border space-y-2">
+            <div>
+              <p className="text-xs text-slate-700 font-medium uppercase tracking-wide">
+                Vista administrador
+              </p>
+              <p className="text-sm font-semibold text-green-800 truncate">
+                {sucursalActivaNombre}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                salirVistaAdministrador();
+                navigate('/dashboard');
+              }}
+              className="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-white text-green-700 border border-green-200 hover:bg-green-100 transition-colors"
+            >
+              Salir de vista administrador
+            </button>
           </div>
-        )}
+        ) : user?.sucursal ? (
+          <div className="px-4 py-3 bg-green-50 border-b border-border">
+            <p className="text-xs text-slate-700 font-medium uppercase tracking-wide">
+              Sucursal activa
+            </p>
+            <p className="text-sm font-semibold text-green-800 truncate">
+              {user.sucursal.nombre}
+            </p>
+          </div>
+        ) : null}
 
         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
           {navItems.map(({ to, icon: Icon, label }) => (

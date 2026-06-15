@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { sucursalesService } from '../../services/sucursales.service';
 import { usuariosService } from '../../services/usuarios.service';
+import { useVistaAdministradorStore } from '../../store/vistaAdministradorStore';
 import type { Sucursal } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -96,6 +97,7 @@ const emptyForm: FormState = {
 export default function SucursalesPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { entrarVistaAdministrador } = useVistaAdministradorStore();
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Sucursal | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -283,6 +285,15 @@ export default function SucursalesPage() {
     return `${administradores.length} administradores`;
   };
 
+  const handleVistaAdministrador = (sucursal: Sucursal) => {
+    entrarVistaAdministrador({
+      id: sucursal.id,
+      nombre: sucursal.nombre,
+    });
+
+    navigate('/dashboard');
+  };
+  
   const handleToggleSucursal = (sucursal: Sucursal) => {
     const accion = sucursal.abierto ? 'cerrar' : 'abrir';
 
@@ -451,6 +462,14 @@ export default function SucursalesPage() {
                 >
                   <Power size={14} aria-hidden="true" />
                   {s.abierto ? 'Cerrar local' : 'Abrir local'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleVistaAdministrador(s)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold bg-emerald-50 text-green-700 hover:bg-emerald-100 transition-colors"
+                >
+                  Vista administrador
                 </button>
 
                 <button
