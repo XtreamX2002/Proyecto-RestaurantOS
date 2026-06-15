@@ -325,10 +325,12 @@ export async function getReportes(req: Request, res: Response): Promise<void> {
       desde,
       hasta,
       meseroId,
+      sucursalId,
     } = req.query as {
       desde?: string;
       hasta?: string;
       meseroId?: string;
+      sucursalId?: string;
     };
 
     const fechaInicio = desde
@@ -352,9 +354,30 @@ export async function getReportes(req: Request, res: Response): Promise<void> {
     }
 
     if (user.rol === 'DUENO') {
-      whereBase.sucursal = {
-        duenoId: user.userId,
-      };
+      if (sucursalId) {
+        const sucursalPermitida = await prisma.sucursal.findFirst({
+          where: {
+            id: sucursalId,
+            duenoId: user.userId,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (!sucursalPermitida) {
+          res.status(403).json({
+            message: 'No tienes acceso a esta sucursal',
+          });
+          return;
+        }
+
+        whereBase.sucursalId = sucursalId;
+      } else {
+        whereBase.sucursal = {
+          duenoId: user.userId,
+        };
+      }
     }
 
     if (meseroId) {
@@ -460,9 +483,13 @@ export async function getReportes(req: Request, res: Response): Promise<void> {
     }
 
     if (user.rol === 'DUENO') {
-      whereMeseros.sucursal = {
-        duenoId: user.userId,
-      };
+      if (sucursalId) {
+        whereMeseros.sucursalId = sucursalId;
+      } else {
+        whereMeseros.sucursal = {
+          duenoId: user.userId,
+        };
+      }
     }
 
     const meseros = await prisma.usuario.findMany({
@@ -509,10 +536,12 @@ export async function exportarReporteExcel(
       desde,
       hasta,
       meseroId,
+      sucursalId,
     } = req.query as {
       desde?: string;
       hasta?: string;
       meseroId?: string;
+      sucursalId?: string;
     };
 
     const fechaInicio = desde
@@ -536,9 +565,30 @@ export async function exportarReporteExcel(
     }
 
     if (user.rol === 'DUENO') {
-      whereBase.sucursal = {
-        duenoId: user.userId,
-      };
+      if (sucursalId) {
+        const sucursalPermitida = await prisma.sucursal.findFirst({
+          where: {
+            id: sucursalId,
+            duenoId: user.userId,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (!sucursalPermitida) {
+          res.status(403).json({
+            message: 'No tienes acceso a esta sucursal',
+          });
+          return;
+        }
+
+        whereBase.sucursalId = sucursalId;
+      } else {
+        whereBase.sucursal = {
+          duenoId: user.userId,
+        };
+      }
     }
 
     if (meseroId) {

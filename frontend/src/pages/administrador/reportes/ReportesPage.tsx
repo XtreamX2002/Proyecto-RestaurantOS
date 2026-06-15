@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { useAuthStore } from '../../../store/authStore';
+import { useVistaAdministradorStore } from '../../../store/vistaAdministradorStore';
 import {
   CalendarDays,
   Download,
@@ -39,6 +41,19 @@ interface ReportesResponse {
 }
 
 export default function ReportesPage() {
+  const { user } = useAuthStore();
+
+  const {
+    activo: vistaAdministradorActiva,
+    sucursalActivaId,
+    sucursalActivaNombre,
+  } = useVistaAdministradorStore();
+
+  const isDuenoEnVistaAdministrador =
+    user?.rol === 'DUENO' &&
+    vistaAdministradorActiva &&
+    Boolean(sucursalActivaId);
+
   const hoy = new Date().toISOString().split('T')[0];
 
   const hace7Dias = new Date();
@@ -61,6 +76,10 @@ export default function ReportesPage() {
     if (hasta) params.append('hasta', hasta);
     if (meseroId) params.append('meseroId', meseroId);
 
+    if (isDuenoEnVistaAdministrador && sucursalActivaId) {
+      params.append('sucursalId', sucursalActivaId);
+    }
+
     const { data } = await api.get<ReportesResponse>(
       `/reportes?${params.toString()}`
     );
@@ -69,7 +88,14 @@ export default function ReportesPage() {
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: ['reportes', desde, hasta, meseroId],
+    queryKey: [
+      'reportes',
+      user?.rol,
+      desde,
+      hasta,
+      meseroId,
+      isDuenoEnVistaAdministrador ? sucursalActivaId : 'normal',
+    ],
     queryFn: fetchReportes,
   });
 
@@ -103,6 +129,10 @@ export default function ReportesPage() {
       if (desde) params.append('desde', desde);
       if (hasta) params.append('hasta', hasta);
       if (meseroId) params.append('meseroId', meseroId);
+
+      if (isDuenoEnVistaAdministrador && sucursalActivaId) {
+        params.append('sucursalId', sucursalActivaId);
+      }
 
       const response = await api.get(
         `/reportes/exportar?${params.toString()}`,
@@ -164,11 +194,13 @@ export default function ReportesPage() {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-8">
         <div>
           <h1 className="text-3xl font-bold text-text">
-            Reportes
+            {isDuenoEnVistaAdministrador ? 'Reportes de sucursal' : 'Reportes'}
           </h1>
 
           <p className="text-text-muted mt-1">
-            Visualiza estadísticas del restaurante
+            {isDuenoEnVistaAdministrador
+              ? `Visualiza estadísticas de ${sucursalActivaNombre}`
+              : 'Visualiza estadísticas del restaurante'}
           </p>
         </div>
 
