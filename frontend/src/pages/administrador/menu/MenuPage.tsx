@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { Download } from 'lucide-react';
 import {
   Plus,
   Search,
@@ -19,6 +22,7 @@ interface Categoria {
 interface Producto {
   id: string;
   nombre: string;
+  disponible: boolean;
   descripcion: string;
   precio: number;
   categoria: {
@@ -53,6 +57,9 @@ export default function MenuPage() {
     imagen: '',
     tipo: 'COCINA' as 'COCINA' | 'COMPLEMENTO',
   });
+
+  const [erroresProducto, setErroresProducto] = useState<string[]>([]);
+  const [erroresEdicion, setErroresEdicion] = useState<string[]>([]);
 
   const cargarCategorias = async () => {
     try {
@@ -93,52 +100,117 @@ export default function MenuPage() {
   };
 
   const crearProducto = async () => {
-    if (!nuevoProducto.nombre || !nuevoProducto.precio || !nuevoProducto.categoriaId)
+    const errores: string[] = [];
+
+    if (!nuevoProducto.nombre?.trim()) {
+      errores.push('El nombre del producto es obligatorio');
+    }
+
+    const precio = Number(nuevoProducto.precio);
+    if (!nuevoProducto.precio || isNaN(precio)) {
+      errores.push('Ingresa un precio válido');
+    } else if (precio <= 0) {
+      errores.push('El precio debe ser mayor a 0');
+    }
+
+    if (!nuevoProducto.categoriaId) {
+      errores.push('Debes seleccionar una categoría');
+    }
+
+    if (errores.length > 0) {
+      setErroresProducto(errores);
       return;
+    }
 
-    await api.post('/productos', {
-      nombre: nuevoProducto.nombre,
-      descripcion: nuevoProducto.descripcion,
-      precio: Number(nuevoProducto.precio),
-      imagen: nuevoProducto.imagen,
-      categoriaId: nuevoProducto.categoriaId,
-      sucursalId: 'sucursal-1',
-      tipo: nuevoProducto.tipo,
-    });
+    try {
+      await api.post('/productos', {
+        nombre: nuevoProducto.nombre,
+        descripcion: nuevoProducto.descripcion || '',
+        precio: Number(nuevoProducto.precio),
+        imagen: nuevoProducto.imagen,
+        categoriaId: nuevoProducto.categoriaId,
+        sucursalId: 'sucursal-1',
+        tipo: nuevoProducto.tipo,
+      });
 
-    setNuevoProducto({
-      nombre: '',
-      descripcion: '',
-      precio: '',
-      categoriaId: '',
-      imagen: '',
-      tipo: 'COCINA',
-    });
+      setNuevoProducto({
+        nombre: '',
+        descripcion: '',
+        precio: '',
+        categoriaId: '',
+        imagen: '',
+        tipo: 'COCINA',
+      });
 
-    setModalProducto(false);
-    cargarProductos();
+      setErroresProducto([]);
+      setModalProducto(false);
+      cargarProductos();
+    } catch (error) {
+      setErroresProducto(['Error al crear el producto']);
+      console.error(error);
+    }
   };
 
   const actualizarProducto = async () => {
     if (!productoEditando) return;
 
-    await api.put(`/productos/${productoEditando.id}`, {
-      nombre: productoEditando.nombre,
-      descripcion: productoEditando.descripcion,
-      precio: productoEditando.precio,
-      imagen: productoEditando.imagen,
-      categoriaId: productoEditando.categoria.id,
-      tipo: productoEditando.tipo,
-    });
+    const errores: string[] = [];
 
-    setModalEditar(false);
-    setProductoEditando(null);
-    cargarProductos();
+    if (!productoEditando.nombre?.trim()) {
+      errores.push('El nombre del producto es obligatorio');
+    }
+
+    if (productoEditando.precio <= 0 || isNaN(productoEditando.precio)) {
+      errores.push('El precio debe ser mayor a 0');
+    }
+
+    if (errores.length > 0) {
+      setErroresEdicion(errores);
+      return;
+    }
+
+    try {
+      await api.put(`/productos/${productoEditando.id}`, {
+        nombre: productoEditando.nombre,
+        descripcion: productoEditando.descripcion || '',
+        precio: productoEditando.precio,
+        imagen: productoEditando.imagen,
+        categoriaId: productoEditando.categoria.id,
+        tipo: productoEditando.tipo,
+      });
+
+      setErroresEdicion([]);
+      setModalEditar(false);
+      setProductoEditando(null);
+      cargarProductos();
+    } catch (error) {
+      setErroresEdicion(['Error al actualizar el producto']);
+      console.error(error);
+    }
   };
 
   const eliminarProducto = async (id: string) => {
     await api.delete(`/productos/${id}`);
     cargarProductos();
+  };
+
+  const cambiarEstadoProducto = async (id: string) => {
+    try {
+      await api.patch(`/productos/${id}/toggle`);
+
+      setProductos((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+              ...p,
+              disponible: !p.disponible,
+            }
+            : p
+        )
+      );
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const productosFiltrados = Array.isArray(productos)
@@ -174,6 +246,68 @@ export default function MenuPage() {
     });
   };
 
+  const exportarMenuPDF = () => {
+    const pdf = new jsPDF();
+    pdf.setFontSize(24);
+    pdf.setTextColor(40, 40, 40);
+    pdf.text('MENÚ DEL RESTAURANTE', 105, 20, { align: 'center' });
+
+    pdf.setFontSize(11);
+    pdf.setTextColor(120, 120, 120);
+    pdf.text(
+      `Generado el ${new Date().toLocaleDateString()}`,
+      105,
+      28,
+      { align: 'center' }
+    );
+
+    let y = 40;
+
+    categorias.forEach((categoria) => {
+      const productosCategoria = productos.filter(
+        (p) => p.categoria.nombre === categoria.nombre
+      );
+
+      if (productosCategoria.length === 0) return;
+
+      pdf.setFillColor(249, 115, 22);
+      pdf.roundedRect(14, y - 5, 182, 10, 2, 2, 'F');
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(14);
+      pdf.text(categoria.nombre.toUpperCase(), 18, y + 1);
+
+      y += 10;
+
+      autoTable(pdf, {
+        startY: y,
+        theme: 'plain',
+        head: [['Producto', 'Descripción', 'Precio']],
+        body: productosCategoria.map((p) => [
+          p.nombre,
+          p.descripcion || '-',
+          `S/ ${Number(p.precio).toFixed(2)}`
+        ]),
+        styles: {
+          fontSize: 10,
+          cellPadding: 3,
+        },
+        headStyles: {
+          fillColor: [249, 115, 22],
+        },
+        columnStyles: {
+          2: {
+            halign: 'right',
+            fontStyle: 'bold',
+          },
+        },
+      });
+
+      y = (pdf as any).lastAutoTable.finalY + 15;
+    });
+    pdf.save('menu-restaurante.pdf');
+  };
+
   return (
     <div className="p-6 bg-background min-h-screen">
 
@@ -188,17 +322,20 @@ export default function MenuPage() {
 
         <div className="flex flex-wrap gap-3">
           <button
+            onClick={exportarMenuPDF}
+            className="flex items-center gap-2 border border-green-600 text-green-600 px-4 py-2 rounded-xl font-medium hover:bg-green-50">
+            <Download size={18} />
+            Exportar menú
+          </button>
+          <button
             onClick={() => setModalCategoria(true)}
-            className="flex items-center gap-2 border border-primary text-primary px-4 py-2 rounded-xl font-medium hover:bg-primary/5"
-          >
+            className="flex items-center gap-2 border border-primary text-primary px-4 py-2 rounded-xl font-medium hover:bg-primary/5">
             <Plus size={18} />
             Nueva categoría
           </button>
-
           <button
             onClick={() => setModalProducto(true)}
-            className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl font-medium hover:bg-primary/90"
-          >
+            className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl font-medium hover:bg-primary/90">
             <Plus size={18} />
             Nuevo producto
           </button>
@@ -270,9 +407,47 @@ export default function MenuPage() {
                 {producto.categoria.nombre}
               </span>
 
-              <h2 className="text-lg font-bold text-text mb-2">
-                {producto.nombre}
-              </h2>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h2 className="text-lg font-bold text-text">
+                    {producto.nombre}
+                  </h2>
+
+                  <span
+                    className={`text-xs font-medium ${producto.disponible
+                      ? 'text-green-600'
+                      : 'text-red-500'
+                      }`}
+                  >
+                    {producto.disponible
+                      ? 'Activo'
+                      : 'Desactivado'}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() =>
+                    cambiarEstadoProducto(producto.id)
+                  }
+                  className={`
+                    relative w-12 h-7 rounded-full transition
+                    ${producto.disponible
+                      ? 'bg-green-500'
+                      : 'bg-gray-300'
+                    }`}
+                >
+                  <span
+                    className={`
+                      absolute top-1 left-1
+                      w-5 h-5 bg-white rounded-full
+                      transition-transform
+                      ${producto.disponible
+                        ? 'translate-x-5'
+                        : ''
+                      }`}
+                  />
+                </button>
+              </div>
 
               <p className="text-sm text-text-muted mb-4 line-clamp-2">
                 {producto.descripcion}
@@ -360,11 +535,24 @@ export default function MenuPage() {
               </h2>
 
               <button
-                onClick={() => setModalProducto(false)}
+                onClick={() => {
+                  setModalProducto(false);
+                  setErroresProducto([]);
+                }}
               >
                 <X size={20} />
               </button>
             </div>
+
+            {erroresProducto.length > 0 && (
+              <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl">
+                <ul className="list-disc list-inside text-red-700 text-sm space-y-1">
+                  {erroresProducto.map((error, idx) => (
+                    <li key={idx}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="md:col-span-2">
@@ -430,18 +618,21 @@ export default function MenuPage() {
 
                 <input
                   type="number"
+                  min="0.01"
+                  step="0.01"
                   value={nuevoProducto.precio}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const valor = e.target.value;
                     setNuevoProducto({
                       ...nuevoProducto,
-                      precio: e.target.value,
-                    })
-                  }
+                      precio: valor,
+                    });
+                  }}
+                  placeholder="0.00"
                   className="w-full border border-border rounded-xl px-4 py-3 outline-none"
                 />
               </div>
 
-              {/* FIX: value apunta a categoriaId, options usan categoria.id y categoria.nombre */}
               <div>
                 <label className="text-sm font-medium mb-2 block">
                   Categoría
@@ -512,7 +703,7 @@ export default function MenuPage() {
 
                 <textarea
                   rows={4}
-                  value={nuevoProducto.descripcion}
+                  value={nuevoProducto.descripcion || ''}
                   onChange={(e) =>
                     setNuevoProducto({
                       ...nuevoProducto,
@@ -555,11 +746,22 @@ export default function MenuPage() {
                 onClick={() => {
                   setModalEditar(false);
                   setProductoEditando(null);
+                  setErroresEdicion([]);
                 }}
               >
                 <X size={20} />
               </button>
             </div>
+
+            {erroresEdicion.length > 0 && (
+              <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl">
+                <ul className="list-disc list-inside text-red-700 text-sm space-y-1">
+                  {erroresEdicion.map((error, idx) => (
+                    <li key={idx}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="md:col-span-2">
@@ -625,6 +827,8 @@ export default function MenuPage() {
 
                 <input
                   type="number"
+                  min="0.01"
+                  step="0.01"
                   value={productoEditando.precio}
                   onChange={(e) =>
                     setProductoEditando({
@@ -708,7 +912,7 @@ export default function MenuPage() {
 
                 <textarea
                   rows={4}
-                  value={productoEditando.descripcion}
+                  value={productoEditando.descripcion || ''}
                   onChange={(e) =>
                     setProductoEditando({
                       ...productoEditando,
