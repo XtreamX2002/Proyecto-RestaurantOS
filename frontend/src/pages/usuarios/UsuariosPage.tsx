@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { usuariosService } from '../../services/usuarios.service';
 import { sucursalesService } from '../../services/sucursales.service';
 import { useAuthStore } from '../../store/authStore';
+import { useVistaAdministradorStore } from '../../store/vistaAdministradorStore';
 import type { Usuario } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -62,11 +63,20 @@ export default function UsuariosPage() {
   const qc = useQueryClient();
   const { user } = useAuthStore();
 
+  const {
+    activo: vistaAdministradorActiva,
+    sucursalActivaId,
+    sucursalActivaNombre,
+  } = useVistaAdministradorStore();
+
   const isDueno = user?.rol === 'DUENO';
   const isAdmin = user?.rol === 'ADMIN';
 
+  const isDuenoEnVistaAdministrador =
+    isDueno && vistaAdministradorActiva && Boolean(sucursalActivaId);
+
   const canViewSucursal = isDueno || isAdmin;
-  const canEditSucursal = isDueno;
+  const canEditSucursal = isDueno && !isDuenoEnVistaAdministrador;
   const canManageRoles = isDueno;
   const canAssignAdminRole = isDueno;
 
@@ -111,13 +121,15 @@ export default function UsuariosPage() {
         (estadoFilter === 'INACTIVO' && !usuario.activo);
 
       const matchesSucursal =
-        !isDueno ||
-        sucursalFilter === 'TODAS' ||
-        usuarioSucursalId === sucursalFilter;
+        isDuenoEnVistaAdministrador
+          ? usuarioSucursalId === sucursalActivaId
+          : !isDueno ||
+            sucursalFilter === 'TODAS' ||
+            usuarioSucursalId === sucursalFilter;
 
       return matchesSearch && matchesRol && matchesEstado && matchesSucursal;
     });
-  }, [usuariosVisibles, searchTerm, rolFilter, estadoFilter, sucursalFilter, isDueno]);
+  }, [usuariosVisibles, searchTerm, rolFilter, estadoFilter, sucursalFilter, isDueno, isDuenoEnVistaAdministrador, sucursalActivaId]);
 
   const { data: sucursales = [] } = useQuery({
     queryKey: ['sucursales'],
@@ -199,7 +211,9 @@ export default function UsuariosPage() {
     setIsModalEditing(true);
     setForm({
       ...emptyForm,
-      sucursalId: isDueno ? '' : user?.sucursalId ?? '',
+      sucursalId: isDuenoEnVistaAdministrador 
+        ? sucursalActivaId ?? ''
+        : isDueno ? '' : user?.sucursalId ?? '',
     });
     setShowModal(true);
   };
@@ -293,9 +307,14 @@ export default function UsuariosPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-text">Usuarios</h2>
+          <h2 className="text-lg font-semibold text-text">
+            {isDuenoEnVistaAdministrador ? 'Personal' : 'Usuarios'}
+          </h2>
+
           <p className="text-sm text-text-muted">
-            {usuariosVisibles.length} usuario{usuariosVisibles.length !== 1 ? 's' : ''} registrado{usuariosVisibles.length !== 1 ? 's' : ''}
+            {isDuenoEnVistaAdministrador
+              ? `Personal de ${sucursalActivaNombre}`
+              : `${usuariosVisibles.length} usuario${usuariosVisibles.length !== 1 ? 's' : ''} registrado${usuariosVisibles.length !== 1 ? 's' : ''}`}
           </p>
         </div>
         <Button onClick={openNew}><Plus size={16} /> Nuevo usuario</Button>
@@ -370,7 +389,7 @@ export default function UsuariosPage() {
                   <option value="INACTIVO">Inactivos</option>
                 </select>
               </div>
-              {isDueno && (
+              {isDueno && !isDuenoEnVistaAdministrador && (
                 <div>
                   <label
                     htmlFor="filtro-sucursal-usuario"
@@ -397,8 +416,7 @@ export default function UsuariosPage() {
 
             <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
               <p className="text-sm text-text-muted">
-                Mostrando <span className="font-semibold text-text">{usuariosFiltrados.length}</span> de{' '}
-                <span className="font-semibold text-text">{usuariosVisibles.length}</span> usuarios
+                Mostrando <span className="font-semibold text-text">{usuariosFiltrados.length}</span> usuario{usuariosFiltrados.length !== 1 ? 's' : ''}
               </p>
 
               {(searchTerm || rolFilter !== 'TODOS' || estadoFilter !== 'TODOS' || sucursalFilter !== 'TODAS') && (
