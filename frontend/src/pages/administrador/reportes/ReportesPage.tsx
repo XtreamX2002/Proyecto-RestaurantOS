@@ -68,13 +68,10 @@ export default function ReportesPage() {
     return data;
   };
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['reportes', desde, hasta, meseroId],
     queryFn: fetchReportes,
   });
-
-  console.log('ERROR:', error);
-
 
   const ventasData = data?.ventasPorDia ?? [];
   const pedidosData = data?.pedidosPorDia ?? [];
