@@ -284,12 +284,9 @@ function AppRoutes() {
           <Route
             path="/asistencias"
             element={
-              <RequireRole
-                user={user}
-                roles={['ADMIN']}
-              >
+              <RequireAdminOrDuenoVistaAdministrador user={user}>
                 <AsistenciasPage />
-              </RequireRole>
+              </RequireAdminOrDuenoVistaAdministrador>
             }
           />
 

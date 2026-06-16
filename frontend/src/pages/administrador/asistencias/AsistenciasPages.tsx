@@ -8,6 +8,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { api } from '../../../services/api';
+import { useAuthStore } from '../../../store/authStore';
+import { useVistaAdministradorStore } from '../../../store/vistaAdministradorStore';
 
 interface Personal {
   id: string;
@@ -33,6 +35,24 @@ const getInitials = (name: string) => {
 };
 
 export default function AsistenciasPage() {
+  const { user } = useAuthStore();
+
+  const {
+    activo: vistaAdministradorActiva,
+    sucursalActivaId,
+    sucursalActivaNombre,
+  } = useVistaAdministradorStore();
+
+  const isDuenoEnVistaAdministrador =
+    user?.rol === 'DUENO' &&
+    vistaAdministradorActiva &&
+    Boolean(sucursalActivaId);
+
+  const sucursalIdOperativa =
+    isDuenoEnVistaAdministrador
+      ? sucursalActivaId
+      : user?.sucursalId;
+
   const [personal, setPersonal] = useState<Personal[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,13 +62,23 @@ export default function AsistenciasPage() {
 
   useEffect(() => {
     cargarAsistencias();
-  }, []);
+  }, [sucursalIdOperativa]);
 
   const cargarAsistencias = async () => {
     try {
       setLoading(true);
 
-      const { data } = await api.get<Personal[]>('/asistencias');
+      const params = new URLSearchParams();
+
+      if (isDuenoEnVistaAdministrador && sucursalIdOperativa) {
+        params.append('sucursalId', sucursalIdOperativa);
+      }
+
+      const query = params.toString();
+
+      const { data } = await api.get<Personal[]>(
+        query ? `/asistencias?${query}` : '/asistencias'
+      );
       setPersonal(Array.isArray(data) ? data : []);
 
     } catch (error) {
@@ -77,7 +107,12 @@ export default function AsistenciasPage() {
         horaEntrada: string | null;
       }>(
         `/asistencias/${id}`,
-        { presente: nuevoEstado }
+        {
+          presente: nuevoEstado,
+          sucursalId: isDuenoEnVistaAdministrador
+            ? sucursalIdOperativa
+            : undefined,
+        }
       );
 
       setPersonal((prev) =>

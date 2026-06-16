@@ -5,15 +5,55 @@ const prisma = new PrismaClient();
 
 
 type UserToken = {
-    id: string;
-    rol: 'ADMIN' | 'MESERO' | 'COCINERO';
-    sucursalId: string | null;
+    userId: string;
+    id?: string;
+    rol: 'DUENO' | 'ADMIN' | 'MESERO' | 'COCINERO';
+    sucursalId?: string | null;
 };
 
 const TOLERANCIA_MINUTOS = 10;
 
 const getUser = (req: Request): UserToken | undefined => {
     return req.user as UserToken | undefined;
+};
+
+const obtenerSucursalOperativa = async (req: Request) => {
+    const user = getUser(req);
+
+    if (!user) {
+        return null;
+    }
+
+    if (user.rol === 'ADMIN' || user.rol === 'MESERO' || user.rol === 'COCINERO') {
+        return user.sucursalId ?? null;
+    }
+
+    if (user.rol === 'DUENO') {
+        const sucursalId =
+            typeof req.query.sucursalId === 'string'
+                ? req.query.sucursalId
+                : typeof req.body.sucursalId === 'string'
+                    ? req.body.sucursalId
+                    : null;
+
+        if (!sucursalId) {
+            return null;
+        }
+
+        const sucursal = await prisma.sucursal.findFirst({
+            where: {
+                id: sucursalId,
+                duenoId: user.userId ?? user.id,
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        return sucursal?.id ?? null;
+    }
+
+    return null;
 };
 
 const getFechaSolo = () => {
@@ -59,8 +99,16 @@ export const getAsistencias = async (req: Request, res: Response) => {
 
         const fecha = getFechaSolo();
 
+        const sucursalId = await obtenerSucursalOperativa(req);
+
+        if (!sucursalId) {
+            return res.status(400).json({
+                error: 'Sucursal no encontrada o no autorizada',
+            });
+        }
+
         const whereSucursal = {
-            sucursalId: user.sucursalId!,
+            sucursalId,
         };
 
         const usuarios = await prisma.usuario.findMany({
@@ -114,14 +162,22 @@ export const toggleAsistencia = async (req: Request, res: Response) => {
         const { id } = req.params;
         const { presente } = req.body;
 
+        const sucursalId = await obtenerSucursalOperativa(req);
+
+        if (!sucursalId) {
+            return res.status(400).json({
+                error: 'Sucursal no encontrada o no autorizada',
+            });
+        }
+
         const fecha = getFechaSolo();
         const ahora = new Date();
 
-        const whereEmpleado =
-            user.rol === 'ADMIN'
-                ? { id }
-                : { id, sucursalId: user.sucursalId! };
-
+        const whereEmpleado = {
+            id,
+            sucursalId,
+        }
+            
         const empleado = await prisma.usuario.findFirst({
             where: whereEmpleado,
         });
@@ -150,7 +206,7 @@ export const toggleAsistencia = async (req: Request, res: Response) => {
 
         const sucursal = await prisma.sucursal.findUnique({
             where: {
-                id: empleado.sucursalId!,
+                id: sucursalId,
             },
         });
 
@@ -177,7 +233,7 @@ export const toggleAsistencia = async (req: Request, res: Response) => {
             asistencia = await prisma.asistencia.create({
                 data: {
                     usuarioId: id,
-                    sucursalId: user.sucursalId!,
+                    sucursalId,
                     fecha,
                     presente,
                     horaEntrada: presente ? ahora : null,

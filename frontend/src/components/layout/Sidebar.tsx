@@ -71,6 +71,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     { to: '/usuarios', icon: Users, label: 'Personal' },
     { to: '/reportes', icon: BarChart3, label: 'Reportes' },
     { to: '/mesas', icon: Grid2X2, label: 'Mesas' },
+    { to: '/asistencias', icon: CalendarCheck2, label: 'Asistencias' },
     { to: '/configuracion', icon: Settings, label: 'Configuración' },
   ];
   
