@@ -21,9 +21,11 @@ export async function getPedidosAdmin(
         const {
             busqueda,
             estado,
+            sucursalId,
         } = req.query as {
             busqueda?: string;
             estado?: string;
+            sucursalId?: string;
         };
 
         const where: any = {};
@@ -33,9 +35,31 @@ export async function getPedidosAdmin(
         }
 
         if (user.rol === 'DUENO') {
-            where.sucursal = {
-                duenoId: user.userId,
-            };
+            if (!sucursalId) {
+                res.status(400).json({
+                    error: 'Sucursal requerida para consultar pedidos en vista administrador',
+                });
+                return;
+            }
+
+            const sucursalPermitida = await prisma.sucursal.findFirst({
+                where: {
+                    id: sucursalId,
+                    duenoId: user.userId,
+                },
+                select: {
+                    id: true,
+                },
+            });
+
+            if (!sucursalPermitida) {
+                res.status(403).json({
+                    error: 'No tienes acceso a esta sucursal',
+                });
+                return;
+            }
+
+            where.sucursalId = sucursalId;
         }
 
         if (

@@ -76,7 +76,7 @@ router.patch('/pedidos/:id/cobrar', authMiddleware, roleMiddleware('MESERO', 'AD
 router.patch('/pedidos/:id/cancelar', authMiddleware, roleMiddleware('MESERO', 'ADMIN'), cancelarPedido);
 
 // Pedidos admin
-router.get('/pedidos', authMiddleware, roleMiddleware('ADMIN'), getPedidosAdmin);
+router.get('/pedidos', authMiddleware, roleMiddleware('DUENO', 'ADMIN'), getPedidosAdmin);
 
 // Cocina
 router.get('/pedidos-cocina', authMiddleware, roleMiddleware('COCINERO'), obtenerPedidosCocina);

@@ -6,7 +6,8 @@ import {
   Printer,
 } from 'lucide-react';
 import { api } from '../../../services/api';
-
+import { useAuthStore } from '../../../store/authStore';
+import { useVistaAdministradorStore } from '../../../store/vistaAdministradorStore';
 
 interface ProductoPedido {
   nombre: string;
@@ -27,6 +28,23 @@ interface Pedido {
 }
 
 export default function PedidosPage() {
+  const { user } = useAuthStore();
+
+  const {
+    activo: vistaAdministradorActiva,
+    sucursalActivaId,
+    sucursalActivaNombre,
+  } = useVistaAdministradorStore();
+
+  const isDuenoEnVistaAdministrador =
+    user?.rol === 'DUENO' &&
+    vistaAdministradorActiva &&
+    Boolean(sucursalActivaId);
+
+  const sucursalIdOperativa =
+    isDuenoEnVistaAdministrador
+      ? sucursalActivaId
+      : user?.sucursalId;
 
   const [loading, setLoading] =
     useState(true);
@@ -62,6 +80,10 @@ export default function PedidosPage() {
         params.estado = filtro;
       }
 
+      if (isDuenoEnVistaAdministrador && sucursalIdOperativa) {
+        params.sucursalId = sucursalIdOperativa;
+      }
+
       const { data } = await api.get<Pedido[]>('/pedidos', {
         params,
       });
@@ -91,7 +113,7 @@ export default function PedidosPage() {
 
     return () => clearInterval(interval);
 
-  }, [busqueda, filtro]);
+  }, [busqueda, filtro, sucursalIdOperativa]);
 
   const calcularTotal = (
     productos: ProductoPedido[]
@@ -298,7 +320,7 @@ export default function PedidosPage() {
           </h1>
 
           <p className="text-text-muted mt-1">
-            Visualiza y controla los pedidos
+            Visualiza y filtra los pedidos registrados
           </p>
         </div>
       </div>

@@ -326,12 +326,9 @@ function AppRoutes() {
           <Route
             path="/pedidos"
             element={
-              <RequireRole
-                user={user}
-                roles={['ADMIN']}
-              >
+              <RequireAdminOrDuenoVistaAdministrador user={user}>
                 <PedidosPage />
-              </RequireRole>
+              </RequireAdminOrDuenoVistaAdministrador>
             }
           />
 
