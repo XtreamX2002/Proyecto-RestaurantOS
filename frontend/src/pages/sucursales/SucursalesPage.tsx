@@ -86,6 +86,11 @@ const telefonoValido = (telefono: string) => {
   return /^\d{7}$/.test(telefono) || /^9\d{8}$/.test(telefono);
 };
 
+const getApiErrorMessage = (error: unknown, fallback: string) => {
+  const apiError = error as { response?: { data?: { error?: string } } };
+  return apiError.response?.data?.error ?? fallback;
+};
+
 const emptyForm: FormState = {
   nombre: '',
   direccion: '',
@@ -150,10 +155,10 @@ export default function SucursalesPage() {
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sucursales'] });
-      toast.success('Sucursal creada');
+      showValidationError('Sucursal creada');
       closeModal();
     },
-    onError: () => toast.error('Error al crear sucursal'),
+    onError: (error) => showValidationError(getApiErrorMessage(error, 'Error al crear sucursal')),
   });
 
   const actualizar = useMutation({
@@ -170,21 +175,27 @@ export default function SucursalesPage() {
       toast.success('Sucursal actualizada');
       closeModal();
     },
-    onError: () => toast.error('Error al actualizar'),
+    onError: (error) => showValidationError(getApiErrorMessage(error, 'Error al actualizar sucursal, ya existe una sucursal con ese nombre')),
   });
 
   const toggle = useMutation({
     mutationFn: (id: string) => sucursalesService.toggle(id),
     onSuccess: (data) => { qc.invalidateQueries({ queryKey: ['sucursales'] }); toast.success(data.mensaje); },
-    onError: () => toast.error('Error al cambiar estado'),
+    onError: () => showValidationError('Error al cambiar estado'),
   });
 
   
   const eliminar = useMutation({
     mutationFn: (id: string) => sucursalesService.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sucursales'] }); toast.success('Sucursal eliminada'); },
-    onError: (e: any) => toast.error(e?.response?.data?.error ?? 'Error al eliminar'),
+    onError: (e: any) => showValidationError(e?.response?.data?.error ?? 'Error al eliminar'),
   });
+
+  const showValidationError = (message: string) => {
+    toast.error(message, {
+      id: 'sucursales-form-validation-error',
+    });
+  };
 
   const openNew = () => { setEditing(null); setForm(emptyForm); setShowModal(true); };
   const openEdit = (s: Sucursal) => {
@@ -222,52 +233,52 @@ export default function SucursalesPage() {
     const telefono = form.telefono.trim();
 
     if (nombre.length < 3) {
-      toast.error('El nombre de la sucursal debe tener al menos 3 caracteres');
+      showValidationError('El nombre de la sucursal debe tener al menos 3 caracteres');
       return;
     }
 
     if (nombre.length > 80) {
-      toast.error('El nombre de la sucursal no debe superar 80 caracteres');
+      showValidationError('El nombre de la sucursal no debe superar 80 caracteres');
       return;
     }
 
     if (direccion.length < 5) {
-      toast.error('La dirección es obligatoria y debe tener al menos 5 caracteres');
+      showValidationError('La dirección es obligatoria y debe tener al menos 5 caracteres');
       return;
     }
 
     if (direccion.length > 120) {
-      toast.error('La dirección no debe superar 120 caracteres');
+      showValidationError('La dirección no debe superar 120 caracteres');
       return;
     }
 
     if (!telefono) {
-      toast.error('El teléfono es obligatorio');
+      showValidationError('El teléfono es obligatorio');
       return;
     }
 
     if (!/^\d+$/.test(telefono)) {
-      toast.error('El teléfono solo debe contener números');
+      showValidationError('El teléfono solo debe contener números');
       return;
     }
 
     if (!telefonoValido(telefono)) {
-      toast.error('El teléfono debe tener 7 dígitos o 9 dígitos empezando en 9');
+      showValidationError('El teléfono debe tener 7 dígitos o 9 dígitos empezando en 9');
       return;
     }
 
     if (form.diasOperacion.length === 0) {
-      toast.error('Selecciona al menos un día de operación');
+      showValidationError('Selecciona al menos un día de operación');
       return;
     }
 
     if (!form.horarioApertura || !form.horarioCierre) {
-      toast.error('Configura la hora de apertura y cierre');
+      showValidationError('Configura la hora de apertura y cierre');
       return;
     }
 
     if (form.horarioApertura >= form.horarioCierre) {
-      toast.error('La hora de cierre debe ser posterior a la apertura');
+      showValidationError('La hora de cierre debe ser posterior a la apertura');
       return;
     }
 

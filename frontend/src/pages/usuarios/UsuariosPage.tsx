@@ -168,7 +168,7 @@ export default function UsuariosPage() {
       toast.success('Usuario creado');
       closeModal();
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error ?? 'Error al crear usuario'),
+    onError: (e: any) => showValidationError(e?.response?.data?.error ?? 'Error al crear usuario'),
   });
 
   const actualizar = useMutation({
@@ -194,8 +194,14 @@ export default function UsuariosPage() {
       toast.success('Usuario actualizado');
       closeModal();
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error ?? 'Error al actualizar'),
+    onError: (e: any) => showValidationError(e?.response?.data?.error ?? 'Error al actualizar'),
   });
+
+  const showValidationError = (message: string) => {
+    toast.error(message, {
+      id: 'usuarios-form-validation-error',
+    });
+  };
 
   /*const eliminar = useMutation({
     mutationFn: (id: string) => usuariosService.delete(id),
@@ -262,32 +268,32 @@ export default function UsuariosPage() {
     const nombreValido = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s]+$/.test(nombre);
 
     if (nombre.length < 3) {
-      toast.error('El nombre debe tener al menos 3 caracteres');
+      showValidationError('El nombre debe tener al menos 3 caracteres');
       return;
     }
 
     if (nombre.length > 80) {
-      toast.error('El nombre no debe superar 80 caracteres');
+      showValidationError('El nombre no debe superar 80 caracteres');
       return;
     }
 
     if (!nombreValido) {
-      toast.error('El nombre solo debe contener letras y espacios');
+      showValidationError('El nombre solo debe contener letras y espacios');
       return;
     }
 
     if (email.length > 254) {
-      toast.error('El email no debe superar 254 caracteres');
+      showValidationError('El email no debe superar 254 caracteres');
       return;
     }
 
     if (!emailValido) {
-      toast.error('Ingresa un email válido');
+      showValidationError('Ingresa un email válido');
       return;
     }
 
     if (!editing && form.password.length < 6) {
-      toast.error('La contraseña debe tener al menos 6 caracteres');
+      showValidationError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
 

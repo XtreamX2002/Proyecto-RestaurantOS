@@ -10,6 +10,15 @@ const normalizarNombreSucursal = (value: string) => {
     .replace(/\s+/g, ' ');
 };
 
+const normalizarNombreParaComparar = (value: string) => {
+  return value
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+};
+
 const normalizarDireccionSucursal = (value: string) => {
   return value
     .trim()
@@ -119,6 +128,22 @@ export async function createSucursal(req: Request, res: Response): Promise<void>
     return;
   }
 
+  const nombreComparacion = normalizarNombreParaComparar(nombreNormalizado);
+
+  const sucursalesDelDueno = await prisma.sucursal.findMany({
+    where: { duenoId: req.user!.userId },
+    select: { id: true, nombre: true },
+  });
+
+  const nombreDuplicado = sucursalesDelDueno.some(
+    (sucursal) => normalizarNombreParaComparar(sucursal.nombre) === nombreComparacion
+  );
+
+  if (nombreDuplicado) {
+    res.status(400).json({ error: 'Ya existe una sucursal con ese nombre' });
+    return;
+  }
+
   const sucursal = await prisma.sucursal.create({
     data: {
       nombre: nombreNormalizado,
@@ -140,7 +165,7 @@ export async function updateSucursal(req: Request, res: Response): Promise<void>
 
   const existe = await prisma.sucursal.findUnique({
     where: { id: req.params.id },
-    select: { id: true },
+    select: { id: true, duenoId: true },
   });
 
   if (!existe) {
@@ -172,6 +197,24 @@ export async function updateSucursal(req: Request, res: Response): Promise<void>
 
     if (!nombreSucursalValido(nombreNormalizado)) {
       res.status(400).json({ error: 'El nombre de la sucursal contiene caracteres no permitidos' });
+      return;
+    }
+
+    const nombreComparacion = normalizarNombreParaComparar(nombreNormalizado);
+
+    const sucursalesDelDueno = await prisma.sucursal.findMany({
+      where: { duenoId: existe.duenoId },
+      select: { id: true, nombre: true },
+    });
+
+    const nombreDuplicado = sucursalesDelDueno.some(
+      (sucursal) =>
+        sucursal.id !== req.params.id &&
+        normalizarNombreParaComparar(sucursal.nombre) === nombreComparacion
+    );
+
+    if (nombreDuplicado) {
+      res.status(400).json({ error: 'Ya existe una sucursal con ese nombre' });
       return;
     }
 
