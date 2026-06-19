@@ -49,9 +49,11 @@ describe('Dueño - Control operativo de sucursal', () => {
 
     cy.get('body').then(($body) => {
       if ($body.text().includes('Cerrar local')) {
-        cy.on('window:confirm', () => true);
-
         cy.contains('button', 'Cerrar local')
+          .should('be.visible')
+          .click();
+
+        cy.contains('button', 'Sí, cerrar local')
           .should('be.visible')
           .click();
 
@@ -86,9 +88,11 @@ describe('Dueño - Control operativo de sucursal', () => {
 
     cy.get('body').then(($body) => {
       if ($body.text().includes('Abrir local')) {
-        cy.on('window:confirm', () => true);
-
         cy.contains('button', 'Abrir local')
+          .should('be.visible')
+          .click();
+
+        cy.contains('button', 'Sí, abrir local')
           .should('be.visible')
           .click();
 

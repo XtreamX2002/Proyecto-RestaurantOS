@@ -9,6 +9,7 @@ import { usuariosService } from '../../services/usuarios.service';
 import { useVistaAdministradorStore } from '../../store/vistaAdministradorStore';
 import type { Sucursal } from '../../types';
 import toast from 'react-hot-toast';
+import Swal from 'sweetalert2';
 
 interface FormState {
   nombre: string;
@@ -294,16 +295,26 @@ export default function SucursalesPage() {
     navigate('/dashboard');
   };
   
-  const handleToggleSucursal = (sucursal: Sucursal) => {
-    const accion = sucursal.abierto ? 'cerrar' : 'abrir';
+  const handleToggleSucursal = async (sucursal: Sucursal) => {
+    const estaAbierta = sucursal.abierto;
 
-    const mensaje = sucursal.abierto
-      ? `¿Deseas cerrar "${sucursal.nombre}"?\n\nLos meseros y cocineros ya no podrán operar en esta sucursal.`
-      : `¿Deseas abrir "${sucursal.nombre}"?\n\nLos usuarios asignados podrán iniciar sesión y operar en esta sucursal.`;
+    const resultado = await Swal.fire({
+      title: estaAbierta ? '¿Cerrar local?' : '¿Abrir local?',
+      text: estaAbierta
+        ? `Los meseros y cocineros ya no podrán operar en "${sucursal.nombre}".`
+        : `Los usuarios asignados podrán iniciar sesión y operar en "${sucursal.nombre}".`,
+      icon: estaAbierta ? 'warning' : 'question',
+      showCancelButton: true,
+      confirmButtonText: estaAbierta ? 'Sí, cerrar local' : 'Sí, abrir local',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: estaAbierta ? '#dc2626' : '#16a34a',
+      cancelButtonColor: '#6b7280',
+      reverseButtons: true,
+    });
 
-    if (confirm(mensaje)) {
-      toggle.mutate(sucursal.id);
-    }
+    if (!resultado.isConfirmed) return;
+
+    toggle.mutate(sucursal.id);
   };
 
   return (
